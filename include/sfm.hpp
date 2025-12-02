@@ -28,8 +28,9 @@
 #include <cmath>
 #include <unordered_map>
 #include <vector>
-#include <list>
-
+#include <unordered_map>
+#include <vector>
+#include <string>
 namespace sfm {
 struct Forces {
   utils::Vector2d desiredForce;
@@ -46,9 +47,9 @@ struct Forces {
 struct Parameters {
   Parameters()
       : forceFactorDesired(2.0), forceFactorObstacle(10),
-        forceSigmaObstacle(0.2), forceFactorSocial(2.1),
+        forceSigmaObstacle(0.6), forceFactorSocial(2.1),
         forceFactorGroupGaze(3.0), forceFactorGroupCoherence(2.0),
-        forceFactorGroupRepulsion(1.0), lambda(2.0), gamma(0.35), n(2.0), epsilon(0.005),
+        forceFactorGroupRepulsion(1.0), lambda(2.0), gamma(0.35), n(2.0),
         nPrime(3.0), relaxationTime(0.5) {}
 
   double forceFactorDesired;
@@ -61,7 +62,6 @@ struct Parameters {
   double lambda;
   double gamma;
   double n;
-  double epsilon;
   double nPrime;
   double relaxationTime;
 };
@@ -75,21 +75,27 @@ struct Agent {
   Agent()
       : desiredVelocity(0.6), radius(0.35), cyclicGoals(false),
         teleoperated(false), antimove(false), linearVelocity(0),
-        angularVelocity(0), groupId(-1) {}
+        angularVelocity(0), groupId(-1),
+        semantic_instance_id(-1), semantic_class("unknown"){}
 
   Agent(double linearVelocity, double angularVelocity)
       : desiredVelocity(0.6), radius(0.35), cyclicGoals(false),
         teleoperated(true), antimove(false), linearVelocity(linearVelocity),
-        angularVelocity(angularVelocity), groupId(-1) {}
+        angularVelocity(angularVelocity), groupId(-1) ,
+        semantic_instance_id(-1), semantic_class("unknown"){}
 
   Agent(const utils::Vector2d &position, const utils::Angle &yaw,
         double linearVelocity, double angularVelocity)
       : position(position), yaw(yaw), desiredVelocity(0.6), radius(0.35),
         cyclicGoals(false), teleoperated(true), antimove(false),
         linearVelocity(linearVelocity), angularVelocity(angularVelocity),
-        groupId(-1) {}
+        groupId(-1) ,
+        semantic_instance_id(-1), semantic_class("unknown"){}
 
   void move(double dt); // only if teleoperated
+
+  int         semantic_instance_id;
+  std::string semantic_class;
 
   utils::Vector2d position;
   utils::Vector2d velocity;
@@ -219,8 +225,8 @@ inline void SocialForceModel::computeObstacleForce(Agent &agent,
           std::exp(-distance / agent.params.forceSigmaObstacle) *
           minDiff.normalized();
     }
-    //agent.forces.obstacleForce /=
-    //    (double)(agent.obstacles1.size() + agent.obstacles2.size());
+    agent.forces.obstacleForce /=
+        (double)(agent.obstacles1.size() + agent.obstacles2.size());
   } else if (map != NULL) {
     const Map::Obstacle &obs = map->getNearestObstacle(agent.position);
     utils::Vector2d minDiff = agent.position - obs.position;
@@ -244,7 +250,6 @@ SocialForceModel::computeSocialForce(unsigned index,
       continue;
     }
     utils::Vector2d diff = agents[i].position - agent.position;
-
     utils::Vector2d diffDirection = diff.normalized();
     utils::Vector2d velDiff = agent.velocity - agents[i].velocity;
     utils::Vector2d interactionVector =
@@ -252,11 +257,9 @@ SocialForceModel::computeSocialForce(unsigned index,
     double interactionLength = interactionVector.norm();
     utils::Vector2d interactionDirection =
         interactionVector / interactionLength;
-
-    double B = agent.params.gamma * interactionLength;
     utils::Angle theta = interactionDirection.angleTo(diffDirection);
-    theta.setRadian(theta.toRadian() + (agent.params.epsilon * B));
-    double thetaRad = theta.toRadian()  ;
+    double B = agent.params.gamma * interactionLength;
+    double thetaRad = theta.toRadian();
     double forceVelocityAmount =
         -std::exp(-diff.norm() / B - PW(agent.params.nPrime * B * thetaRad));
     double forceAngleAmount =
@@ -271,6 +274,15 @@ SocialForceModel::computeSocialForce(unsigned index,
       agent.forces.robotSocialForce =
           agent.params.forceFactorSocial * (forceVelocity + forceAngle);
     }
+  }
+    
+  double mag = agent.forces.socialForce.norm();
+  if (mag > 1e-8) {
+    double newMag = mag - 200000.0;
+    agent.forces.socialForce = (agent.forces.socialForce / mag) * newMag;
+  }
+  else{
+    agent.forces.socialForce.set(-10, -10);
   }
 }
 
@@ -304,6 +316,15 @@ SocialForceModel::computeSocialForce(Agent &me,
         forceAngleAmount * interactionDirection.leftNormalVector();
     me.forces.socialForce +=
         me.params.forceFactorSocial * (forceVelocity + forceAngle);
+
+    double mag = me.forces.socialForce.norm();
+    if (mag > 1e-8) {
+      double newMag = mag - 200000.0;
+      me.forces.socialForce = (me.forces.socialForce / mag) * newMag;
+    }
+    else{
+      me.forces.socialForce.set(-10, -10);
+    }
     // if (i == 0)
     //{
     //  agent.forces.robotSocialForce =
