@@ -4,16 +4,8 @@
   <name>lightsfm</name>
   <version>1.0.0</version>
   <description>
-    Header-only Social Force Model library (Helbing/Molnar with Moussaid social
-    term), forked from robotics-upo/lightsfm.
-
-    Arena packages this as an ament CMake package so the headers are a normal
-    source dependency under src/deps/. Upstream ships only a Makefile whose
-    `install` target copies the headers into /usr/local/include/lightsfm --
-    that path is baked into the arena container image and is not a bind mount,
-    so edits there were silently reverted by `docker compose --force-recreate`
-    and had to be replayed by hand. Building from source removes that failure
-    mode: edit include/sfm.hpp, rebuild hunav_agent_manager, done.
+    Header-only Social Force Model library, forked from robotics-upo/lightsfm
+    and packaged for ament so Arena can build it from source.
   </description>
   <maintainer email="zzt2002918@gmail.com">ZhiTao Zhou</maintainer>
   <license>MIT</license>

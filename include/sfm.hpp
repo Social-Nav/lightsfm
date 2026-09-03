@@ -219,13 +219,8 @@ inline void SocialForceModel::computeObstacleForce(Agent &agent,
           std::exp(-distance / agent.params.forceSigmaObstacle) *
           minDiff.normalized();
     }
-    // ARENA (Social-Nav): restored upstream's commented-out normalization so that
-    // forceFactorObstacle keeps the single-point semantics it was tuned for.
-    // Without this the force scales with the raycast hit count (hunav feeds all
-    // 36 rays into obstacles1), and at a doorway the opposing jambs' backward
-    // components add into a barrier the desired force cannot beat.
-    // TRADEOFF: divides by ALL hits including far ones that contribute almost
-    // nothing, so straight-wall repulsion drops ~6x too. See patch header.
+    // Averaged, not summed: hunav pushes every raycast hit into obstacles1, and
+    // summing scales the force by the hit count.
     agent.forces.obstacleForce /=
         (double)(agent.obstacles1.size() + agent.obstacles2.size());
   } else if (map != NULL) {
